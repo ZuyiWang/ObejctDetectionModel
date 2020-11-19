@@ -1,0 +1,5 @@
+/HOG/venv/
+/HOG/.idea/
+/HOG/data/INRIAPerson
+/HOG/data/cifar-10-batches-py
+/HOG/data/INRIAPerson.tar

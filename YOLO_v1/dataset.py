@@ -94,6 +94,7 @@ class yoloDataset(data.Dataset):
             img = t(img)
 
         return img,target
+        
     def __len__(self):
         return self.num_samples
 
@@ -106,11 +107,11 @@ class yoloDataset(data.Dataset):
         grid_num = 14
         target = torch.zeros((grid_num,grid_num,30))
         cell_size = 1./grid_num
-        wh = boxes[:,2:]-boxes[:,:2]
-        cxcy = (boxes[:,2:]+boxes[:,:2])/2
+        wh = boxes[:,2:]-boxes[:,:2]    # width and height
+        cxcy = (boxes[:,2:]+boxes[:,:2])/2    # center of box
         for i in range(cxcy.size()[0]):
             cxcy_sample = cxcy[i]
-            ij = (cxcy_sample/cell_size).ceil()-1 #
+            ij = (cxcy_sample/cell_size).ceil()-1 # 物体落在的ceil的坐标
             target[int(ij[1]),int(ij[0]),4] = 1
             target[int(ij[1]),int(ij[0]),9] = 1
             target[int(ij[1]),int(ij[0]),int(labels[i])+9] = 1
@@ -121,6 +122,7 @@ class yoloDataset(data.Dataset):
             target[int(ij[1]),int(ij[0]),7:9] = wh[i]
             target[int(ij[1]),int(ij[0]),5:7] = delta_xy
         return target
+
     def BGR2RGB(self,img):
         return cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
     def BGR2HSV(self,img):

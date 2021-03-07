@@ -61,9 +61,10 @@ class yoloLoss(nn.Module):
         target_tensor: (tensor) size(batchsize,S,S,Bx5+20)
         '''
         N = pred_tensor.size()[0]
-        coo_mask = target_tensor[:,:,:,4] > 0
+        # confidence == 0 or IOU
+        coo_mask = target_tensor[:,:,:,4] > 0    #(batchsize, S, S)
         noo_mask = target_tensor[:,:,:,4] == 0
-        coo_mask = coo_mask.unsqueeze(-1).expand_as(target_tensor)
+        coo_mask = coo_mask.unsqueeze(-1).expand_as(target_tensor)  #(batchsize, S, S, 30)
         noo_mask = noo_mask.unsqueeze(-1).expand_as(target_tensor)
 
         coo_pred = pred_tensor[coo_mask].view(-1,30)
@@ -77,18 +78,23 @@ class yoloLoss(nn.Module):
         # compute not contain obj loss
         noo_pred = pred_tensor[noo_mask].view(-1,30)
         noo_target = target_tensor[noo_mask].view(-1,30)
-        noo_pred_mask = torch.cuda.ByteTensor(noo_pred.size())
-        noo_pred_mask.zero_()
-        noo_pred_mask[:,4]=1;noo_pred_mask[:,9]=1
+        # noo_pred_mask = torch.cuda.ByteTensor(noo_pred.size())
+        # noo_pred_mask.zero_()
+        # noo_pred_mask[:,4]=1;noo_pred_mask[:,9]=1
+        noo_pred_mask = (torch.zeros(noo_pred.size()) > 0).to('cuda')
+        noo_pred_mask[:,4]=True;noo_pred_mask[:,9]=True
         noo_pred_c = noo_pred[noo_pred_mask] #noo pred只需要计算 c 的损失 size[-1,2]
         noo_target_c = noo_target[noo_pred_mask]
         nooobj_loss = F.mse_loss(noo_pred_c,noo_target_c,size_average=False)
 
         #compute contain obj loss
-        coo_response_mask = torch.cuda.ByteTensor(box_target.size())
-        coo_response_mask.zero_()
-        coo_not_response_mask = torch.cuda.ByteTensor(box_target.size())
-        coo_not_response_mask.zero_()
+        coo_response_mask = (torch.zeros(box_target.size()) > 0).to('cuda')
+        coo_not_response_mask = (torch.zeros(box_target.size()) > 0).to('cuda')
+        # coo_response_mask = torch.cuda.ByteTensor(box_target.size())
+        # coo_response_mask.zero_()
+        # coo_not_response_mask = torch.cuda.ByteTensor(box_target.size())
+        # coo_not_response_mask.zero_()
+        
         box_target_iou = torch.zeros(box_target.size()).cuda()
         for i in range(0,box_target.size()[0],2): #choose the best iou box
             box1 = box_pred[i:i+2]
@@ -103,8 +109,10 @@ class yoloLoss(nn.Module):
             max_iou,max_index = iou.max(0)
             max_index = max_index.data.cuda()
             
-            coo_response_mask[i+max_index]=1
-            coo_not_response_mask[i+1-max_index]=1
+            # coo_response_mask[i+max_index]=1
+            # coo_not_response_mask[i+1-max_index]=1
+            coo_response_mask[i+max_index]=True
+            coo_not_response_mask[i+1-max_index]=True
 
             #####
             # we want the confidence score to equal the
@@ -132,3 +140,30 @@ class yoloLoss(nn.Module):
         class_loss = F.mse_loss(class_pred,class_target,size_average=False)
 
         return (self.l_coord*loc_loss + 2*contain_loss + not_contain_loss + self.l_noobj*nooobj_loss + class_loss)/N
+
+def test():
+  from resnet_yolo import resnet50, resnet18
+  import torchvision.transforms as transforms
+  from torch.utils.data import DataLoader
+  from dataset import yoloDataset
+
+  test_file_root = '/media/iaes/新加卷/wangzy/VOC07_12_yolov1/VOC2007/JPEGImages'
+  test_dataset = yoloDataset(root=test_file_root,list_file='/home/iaes/ObjectDetectionModel/YOLO_v1/voc2007test.txt',
+                             train=False,transform = [transforms.ToTensor()] )
+  test_loader = DataLoader(test_dataset,batch_size=24,shuffle=False,num_workers=0)
+
+  criterion = yoloLoss(7,2,5,0.5)
+  net = resnet50(pretrained=True, model_pth='/home/iaes/ObjectDetectionModel/YOLO_v1/resnet50-19c8e357.pth')
+  net.cuda()
+  net.eval()  
+  with torch.no_grad():
+    (images, targets) = next(iter(test_loader))
+    images,targets = images.cuda(),targets.cuda()
+
+    pred = net(images)
+    loss = criterion(pred, targets)
+
+
+
+if __name__ == '__main__':
+  test()

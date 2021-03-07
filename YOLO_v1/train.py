@@ -16,15 +16,15 @@ import numpy as np
 
 use_gpu = torch.cuda.is_available()
 
-file_root = '/home/wangzy/ObjectDetectionModel/Data/VOCdevkit/VOC2012_tra_val/JPEGImages'
-test_file_root = '/home/wangzy/ObjectDetectionModel/Data/VOCdevkit/VOC2007_test/JPEGImages'
-log_dir = './runs'
+file_root = '/media/iaes/新加卷/wangzy/VOC07_12_yolov1/VOC2012/JPEGImages'
+test_file_root = '/media/iaes/新加卷/wangzy/VOC07_12_yolov1/VOC2007/JPEGImages'
+log_dir = '/home/iaes/ObjectDetectionModel/YOLO_v1/runs'
 learning_rate = 0.001
 num_epochs = 50
 batch_size = 24
 use_resnet = True
 if use_resnet:
-    net = resnet50(pretrained=True, model_pth='./resnet50-19c8e357.pth')
+    net = resnet50(pretrained=True, model_pth='/home/iaes/ObjectDetectionModel/YOLO_v1/resnet50-19c8e357.pth')
 else:
     net = vgg16_bn()
 # net.classifier = nn.Sequential(
@@ -88,12 +88,12 @@ optimizer = torch.optim.SGD(params, lr=learning_rate, momentum=0.9, weight_decay
 # optimizer = torch.optim.Adam(net.parameters(),lr=learning_rate,weight_decay=1e-4)
 
 # train_dataset = yoloDataset(root=file_root,list_file=['voc12_trainval.txt','voc07_trainval.txt'],train=True,transform = [transforms.ToTensor()] )
-train_dataset = yoloDataset(root=file_root,list_file='voc2012_tra_val.txt',train=True,transform = [transforms.ToTensor()] )
-train_loader = DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=4)
+train_dataset = yoloDataset(root=file_root,list_file='/home/iaes/ObjectDetectionModel/YOLO_v1/voc2012_tra_val.txt',train=True,transform = [transforms.ToTensor()] )
+train_loader = DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=0)
 
 # test_dataset = yoloDataset(root=file_root,list_file='voc07_test.txt',train=False,transform = [transforms.ToTensor()] )
-test_dataset = yoloDataset(root=test_file_root,list_file='voc2007test.txt',train=False,transform = [transforms.ToTensor()] )
-test_loader = DataLoader(test_dataset,batch_size=8,shuffle=False,num_workers=4)
+test_dataset = yoloDataset(root=test_file_root,list_file='/home/iaes/ObjectDetectionModel/YOLO_v1/voc2007test.txt',train=False,transform = [transforms.ToTensor()] )
+test_loader = DataLoader(test_dataset,batch_size=8,shuffle=False,num_workers=0)
 
 print('the dataset has %d images' % (len(train_dataset)))
 print('the batch_size is %d' % (batch_size))

@@ -40,8 +40,8 @@ txt_file = open('voc2012_tra_val.txt','w')
 # lines = [x[:-1] for x in lines]
 # print(lines)
 
-# Annotations = '/home/wangzy/ObjectDetectionModel/Data/VOCdevkit/VOC2007_test/Annotations/'
-Annotations = '/home/wangzy/ObjectDetectionModel/Data/VOCdevkit/VOC2012_tra_val/Annotations/'
+# Annotations = '/media/iaes/新加卷/wangzy/VOC07_12_yolov1/VOC2007/Annotations/'
+Annotations = '/media/iaes/新加卷/wangzy/VOC07_12_yolov1/VOC2012/Annotations/'
 xml_files = os.listdir(Annotations)
 xml_files.sort()
 

@@ -16,6 +16,7 @@ import numpy as np
 import argparse
 
 
+
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
@@ -47,8 +48,10 @@ parser.add_argument('--weight_decay', default=5e-4, type=float,
                     help='Weight decay for SGD')
 parser.add_argument('--gamma', default=0.1, type=float,
                     help='Gamma update for SGD')
-parser.add_argument('--visdom', default=False, type=str2bool,
-                    help='Use visdom for loss visualization')
+# parser.add_argument('--visdom', default=False, type=str2bool,
+#                     help='Use visdom for loss visualization')
+parser.add_argument('--tensorboard', default=True, type=str2bool,
+                    help='Use Tensorboard for loss visualization')
 parser.add_argument('--save_folder', default='weights/',
                     help='Directory for saving checkpoint models')
 args = parser.parse_args()
@@ -88,15 +91,22 @@ def train():
                                transform=SSDAugmentation(cfg['min_dim'],
                                                          MEANS))
 
-    if args.visdom:
-        import visdom
-        viz = visdom.Visdom()
+    # if args.visdom:
+    #     import visdom
+    #     viz = visdom.Visdom()
+    if args.tensorboard:
+        from torch.utils.tensorboard import SummaryWriter
+        log_dir = './runs'
+        writer = SummaryWriter(log_dir)
+
 
     ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
     net = ssd_net
+    device_ids = [0]
 
     if args.cuda:
-        net = torch.nn.DataParallel(ssd_net)
+        net = torch.nn.DataParallel(ssd_net, device_ids) # 并行训练
+        # A bool, if True, causes cuDNN to benchmark multiple convolution algorithms and select the fastest.
         cudnn.benchmark = True
 
     if args.resume:
@@ -136,11 +146,11 @@ def train():
 
     step_index = 0
 
-    if args.visdom:
-        vis_title = 'SSD.PyTorch on ' + dataset.name
-        vis_legend = ['Loc Loss', 'Conf Loss', 'Total Loss']
-        iter_plot = create_vis_plot('Iteration', 'Loss', vis_title, vis_legend)
-        epoch_plot = create_vis_plot('Epoch', 'Loss', vis_title, vis_legend)
+    # if args.visdom:
+    #     vis_title = 'SSD.PyTorch on ' + dataset.name
+    #     vis_legend = ['Loc Loss', 'Conf Loss', 'Total Loss']
+    #     iter_plot = create_vis_plot('Iteration', 'Loss', vis_title, vis_legend)
+    #     epoch_plot = create_vis_plot('Epoch', 'Loss', vis_title, vis_legend)
 
     data_loader = data.DataLoader(dataset, args.batch_size,
                                   num_workers=args.num_workers,
@@ -149,9 +159,20 @@ def train():
     # create batch iterator
     batch_iterator = iter(data_loader)
     for iteration in range(args.start_iter, cfg['max_iter']):
-        if args.visdom and iteration != 0 and (iteration % epoch_size == 0):
-            update_vis_plot(epoch, loc_loss, conf_loss, epoch_plot, None,
-                            'append', epoch_size)
+        # if args.visdom and iteration != 0 and (iteration % epoch_size == 0):
+        #     update_vis_plot(epoch, loc_loss, conf_loss, epoch_plot, None,
+        #                     'append', epoch_size)
+        #     # reset epoch loss counters
+        #     loc_loss = 0
+        #     conf_loss = 0
+        #     epoch += 1
+
+        if args.tensorboard and iteration != 0 and (iteration % epoch_size == 0):
+            writer.add_scalar('Loc_loss/epoch', loc_loss, epoch)
+            # writer.add_scalars('Loc_loss/iteration', loc_loss, iteration)
+
+            writer.add_scalar('conf_loss/epoch', conf_loss, epoch)
+            # writer.add_scalars('conf_loss/iteration', conf_loss, iteration)
             # reset epoch loss counters
             loc_loss = 0
             conf_loss = 0
@@ -162,14 +183,22 @@ def train():
             adjust_learning_rate(optimizer, args.gamma, step_index)
 
         # load train data
-        images, targets = next(batch_iterator)
+        # images, targets = next(batch_iterator)  # raise StopIteration
+        try:
+            images, targets = next(batch_iterator)
+        except StopIteration:
+            batch_iterator = iter(data_loader)
+            images, targets = next(batch_iterator)
+
 
         if args.cuda:
             images = Variable(images.cuda())
-            targets = [Variable(ann.cuda(), volatile=True) for ann in targets]
+            # targets = [Variable(ann.cuda(), volatile=True) for ann in targets]
+            targets = [ann.cuda() for ann in targets]
         else:
             images = Variable(images)
-            targets = [Variable(ann, volatile=True) for ann in targets]
+            # targets = [Variable(ann, volatile=True) for ann in targets]
+            targets = [ann.cuda() for ann in targets]
         # forward
         t0 = time.time()
         out = net(images)
@@ -180,16 +209,21 @@ def train():
         loss.backward()
         optimizer.step()
         t1 = time.time()
-        loc_loss += loss_l.data[0]
-        conf_loss += loss_c.data[0]
+        # loc_loss += loss_l.data[0]
+        # conf_loss += loss_c.data[0]
+        loc_loss += loss_l.item()
+        conf_loss += loss_c.item()
 
         if iteration % 10 == 0:
             print('timer: %.4f sec.' % (t1 - t0))
-            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]), end=' ')
+            # print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]), end=' ')
+            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.item()), end=' ')
 
-        if args.visdom:
-            update_vis_plot(iteration, loss_l.data[0], loss_c.data[0],
-                            iter_plot, epoch_plot, 'append')
+        # if args.visdom:
+        #     update_vis_plot(iteration, loss_l.data[0], loss_c.data[0],
+        #                     iter_plot, epoch_plot, 'append')
+        if args.tensorboard:         
+            writer.add_scalar('Total_loss/iteration', loss, iteration)
 
         if iteration != 0 and iteration % 5000 == 0:
             print('Saving state, iter:', iteration)
@@ -211,7 +245,7 @@ def adjust_learning_rate(optimizer, gamma, step):
 
 
 def xavier(param):
-    init.xavier_uniform(param)
+    init.xavier_uniform_(param)
 
 
 def weights_init(m):

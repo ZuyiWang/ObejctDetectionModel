@@ -7,3 +7,8 @@
 /YOLO_v1/__pycache__
 /YOLO_v1/*.pth
 /YOLO_v1/.vscode
+/.vscode
+/SSD/__pycache__
+/SSD/.vscode
+/SSD/weights
+/SSD/runs

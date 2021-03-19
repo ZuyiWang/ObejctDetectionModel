@@ -79,6 +79,7 @@ class MultiBoxLoss(nn.Module):
         loc_t = Variable(loc_t, requires_grad=False)
         conf_t = Variable(conf_t, requires_grad=False)
 
+        # positive 正样本
         pos = conf_t > 0
         num_pos = pos.sum(dim=1, keepdim=True)
 
@@ -90,19 +91,18 @@ class MultiBoxLoss(nn.Module):
         loss_l = F.smooth_l1_loss(loc_p, loc_t, size_average=False)
 
         # Compute max conf across batch for hard negative mining
-        batch_conf = conf_data.view(-1, self.num_classes)
-        loss_c = log_sum_exp(batch_conf) - batch_conf.gather(1, conf_t.view(-1, 1))
+        batch_conf = conf_data.view(-1, self.num_classes) # (batch_size*8762, num_classes)      
+        loss_c = log_sum_exp(batch_conf) - batch_conf.gather(1, conf_t.view(-1, 1)) # softmax的计算技巧 LogSumExp
 
         # Hard Negative Mining
-        pos_loss = pos.view(-1)
-        loss_c[pos_loss] = 0
         # loss_c[pos] = 0  # filter out pos boxes for now
         loss_c = loss_c.view(num, -1)
+        loss_c[pos] = 0   # filter out pos boxes for now    要对所有Neg进行排序，所以Pos的loss赋值0
         _, loss_idx = loss_c.sort(1, descending=True)
         _, idx_rank = loss_idx.sort(1)
-        num_pos = pos.long().sum(1, keepdim=True)
+        num_pos = pos.long().sum(1, keepdim=True)   # (batch_size, 1) 每张图片中positive的default box的个数
         num_neg = torch.clamp(self.negpos_ratio*num_pos, max=pos.size(1)-1)
-        neg = idx_rank < num_neg.expand_as(idx_rank)
+        neg = idx_rank < num_neg.expand_as(idx_rank) # (batch_size, num_priorbox)
 
         # Confidence Loss Including Positive and Negative Examples
         pos_idx = pos.unsqueeze(2).expand_as(conf_data)

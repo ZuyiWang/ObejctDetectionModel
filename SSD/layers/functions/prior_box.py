@@ -5,8 +5,8 @@ import torch
 
 
 class PriorBox(object):
-    """Compute priorbox coordinates in center-offset form for each source
-    feature map.
+    """Compute priorbox coordinates in center-offset form for each source feature map.
+    default box的个数   8732= 38x38x4 + 19x19x6 + 10x10x6 + 5x5x6 + 3x3x4 + 1x1x4
     """
     def __init__(self, cfg):
         super(PriorBox, self).__init__()
@@ -31,11 +31,16 @@ class PriorBox(object):
             for i, j in product(range(f), repeat=2):
                 f_k = self.image_size / self.steps[k]
                 # unit center x,y
+                # paper中选择的是(i+0.5)/the size of feature map, f_k似乎没必要
                 cx = (j + 0.5) / f_k
                 cy = (i + 0.5) / f_k
+                # cx = (j + 0.5) / f
+                # cy = (i + 0.5) / f                
+
 
                 # aspect_ratio: 1
                 # rel size: min_size
+                # paper中的scale_k的计算公式不同, s_k = s_min + (s_max - s_min) * (k - 1) / (m - 1)
                 s_k = self.min_sizes[k]/self.image_size
                 mean += [cx, cy, s_k, s_k]
 
@@ -45,6 +50,7 @@ class PriorBox(object):
                 mean += [cx, cy, s_k_prime, s_k_prime]
 
                 # rest of aspect ratios
+                # aspect ratio in paper [1, 2, 3, 1/2, 1/3], 这里有的feature map没有用3与1/3的ar，即只有4个default box
                 for ar in self.aspect_ratios[k]:
                     mean += [cx, cy, s_k*sqrt(ar), s_k/sqrt(ar)]
                     mean += [cx, cy, s_k/sqrt(ar), s_k*sqrt(ar)]

@@ -12,6 +12,8 @@ import torch
 import torch.utils.data as data
 import cv2
 import numpy as np
+
+# 检查python版本
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
@@ -67,7 +69,7 @@ class VOCAnnotationTransform(object):
             bndbox = []
             for i, pt in enumerate(pts):
                 cur_pt = int(bbox.find(pt).text) - 1
-                # scale height or width
+                # scale height or width 归一化, 方便图片resize之后定位
                 cur_pt = cur_pt / width if i % 2 == 0 else cur_pt / height
                 bndbox.append(cur_pt)
             label_idx = self.class_to_ind[name]

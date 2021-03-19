@@ -72,9 +72,11 @@ def match(threshold, truths, priors, variances, labels, loc_t, conf_t, idx):
     """Match each prior box with the ground truth box of the highest jaccard
     overlap, encode the bounding boxes, then return the matched indices
     corresponding to both confidence and location preds.
+    匹配的规则: 每个GT box都与其有最大IOU的prior box匹配(不论IOU是否大于threshold, 确保每个GT box都有匹配的prior box)
+    剩余的每个prior box拟与其有最大IOU的GT box匹配，但如果IOU小于threshold，则该prior box不与任何GT box匹配，标记为背景
     Args:
         threshold: (float) The overlap threshold used when mathing boxes.
-        truths: (tensor) Ground truth boxes, Shape: [num_obj, num_priors].
+        truths: (tensor) Ground truth boxes, Shape: [num_obj, 4].
         priors: (tensor) Prior boxes from priorbox layers, Shape: [n_priors,4].
         variances: (tensor) Variances corresponding to each prior coord,
             Shape: [num_priors, 4].
@@ -91,7 +93,7 @@ def match(threshold, truths, priors, variances, labels, loc_t, conf_t, idx):
         point_form(priors)
     )
     # (Bipartite Matching)
-    # [1,num_objects] best prior for each ground truth
+    # [num_objects, 1] best prior for each ground truth
     best_prior_overlap, best_prior_idx = overlaps.max(1, keepdim=True)
     # [1,num_priors] best ground truth for each prior
     best_truth_overlap, best_truth_idx = overlaps.max(0, keepdim=True)
@@ -99,14 +101,26 @@ def match(threshold, truths, priors, variances, labels, loc_t, conf_t, idx):
     best_truth_overlap.squeeze_(0)
     best_prior_idx.squeeze_(1)
     best_prior_overlap.squeeze_(1)
-    best_truth_overlap.index_fill_(0, best_prior_idx, 2)  # ensure best prior
+    # index_fill(dim,index,val)按照指定的维度轴dim 根据index去对应位置，将原tensor用参数val值填充
+    # 为了保证每个GT box都有相对应的prior box来预测它，且与该GT box所匹配的prior box它们的IOU值是大于0.5 threshold
+    # 因此，修改每个GT box与其IOU最大的prior box的IOU值为2，保证不会被标记为background，且该对应的prior box不会去匹配其他GT box
+    # 防止以下矛盾: 假如一个GT box1与其IOU最大的prior box小于阈值，而该prior box与某一个GT box2的IOU大于阈值 (实际发生的可能性较小)
+    best_truth_overlap.index_fill_(0, best_prior_idx, 2)  # ensure best prior 用2填充
+
     # TODO refactor: index  best_prior_idx with long tensor
     # ensure every gt matches with its prior of max overlap
+
+    # 根据best_truth_overlap的修改，同时需要修改best_truth_idx
+    # num_objects次循环
     for j in range(best_prior_idx.size(0)):
         best_truth_idx[best_prior_idx[j]] = j
+
+    # 将每个prior box对应的最大IOU的GT box的坐标输入到一个张量 match 中，该张量 match 的维度为 [num_priors,4]，存放所有prior对应的GT box的坐标信息
     matches = truths[best_truth_idx]          # Shape: [num_priors,4]
+    # 提取出所有GT框的类别  
     conf = labels[best_truth_idx] + 1         # Shape: [num_priors]
     conf[best_truth_overlap < threshold] = 0  # label as background
+    # 编码包围框
     loc = encode(matches, priors, variances)
     loc_t[idx] = loc    # [num_priors,4] encoded offsets to learn
     conf_t[idx] = conf  # [num_priors] top class label for each prior
@@ -115,6 +129,8 @@ def match(threshold, truths, priors, variances, labels, loc_t, conf_t, idx):
 def encode(matched, priors, variances):
     """Encode the variances from the priorbox layers into the ground truth boxes
     we have matched (based on jaccard overlap) with the prior boxes.
+    根据GT box的四角坐标和default box的坐标(cx, cy, w, h)，进行边框偏移的计算
+    在SSD中使用variances来作为一个系数，对偏差t进行缩放，参与编码与解码
     Args:
         matched: (tensor) Coords of ground truth for each prior in point-form
             Shape: [num_priors, 4].
@@ -126,11 +142,14 @@ def encode(matched, priors, variances):
     """
 
     # dist b/t match center and prior's center
+    # Gx - Px
     g_cxcy = (matched[:, :2] + matched[:, 2:])/2 - priors[:, :2]
     # encode variance
+    # (Gx - Px)/(Pw*variance[0])
     g_cxcy /= (variances[0] * priors[:, 2:])
     # match wh / prior wh
     g_wh = (matched[:, 2:] - matched[:, :2]) / priors[:, 2:]
+    # log(Gw/Pw)/Variances
     g_wh = torch.log(g_wh) / variances[1]
     # return target for smooth_l1_loss
     return torch.cat([g_cxcy, g_wh], 1)  # [num_priors,4]
@@ -140,6 +159,8 @@ def encode(matched, priors, variances):
 def decode(loc, priors, variances):
     """Decode locations from predictions using priors to undo
     the encoding we did for offset regression at train time.
+    将网络输出的偏移量与default box的坐标解码为真实原图中预测框的坐标，并格式(cx, cy, w, h)转换成左上右下坐标的形式(x1, y1, x2, y2)
+    在SSD中使用variances来作为一个系数，对偏差t进行缩放，参与编码与解码
     Args:
         loc (tensor): location predictions for loc layers,
             Shape: [num_priors,4]
@@ -149,10 +170,11 @@ def decode(loc, priors, variances):
     Return:
         decoded bounding box predictions
     """
-
+    # 从default box的坐标解码为真实的预测框的坐标
     boxes = torch.cat((
         priors[:, :2] + loc[:, :2] * variances[0] * priors[:, 2:],
         priors[:, 2:] * torch.exp(loc[:, 2:] * variances[1])), 1)
+    # 坐标格式的转换, 得到top-left bottom-down的形式
     boxes[:, :2] -= boxes[:, 2:] / 2
     boxes[:, 2:] += boxes[:, :2]
     return boxes

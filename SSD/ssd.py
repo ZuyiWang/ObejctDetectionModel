@@ -126,12 +126,21 @@ class SSD(nn.Module):
 # This function is derived from torchvision VGG make_layers()
 # https://github.com/pytorch/vision/blob/master/torchvision/models/vgg.py
 def vgg(cfg, i, batch_norm=False):
+    """
+    Args:
+        cfg: vgg的配置文件
+        i: 输入图像的通道数
+        batch_norm: batch正则化
+    Return:
+        layers: vgg的包含各层的list
+    """
     layers = []
     in_channels = i
     for v in cfg:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         elif v == 'C':
+            # ceil_mode – when True, will use ceil instead of floor to compute the output shape
             layers += [nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)]
         else:
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
@@ -168,12 +177,14 @@ def add_extras(cfg, i, batch_norm=False):
 def multibox(vgg, extra_layers, cfg, num_classes):
     loc_layers = []
     conf_layers = []
+    # vgg的conv4_3和conv7的feature map用来做预测
     vgg_source = [21, -2]
     for k, v in enumerate(vgg_source):
         loc_layers += [nn.Conv2d(vgg[v].out_channels,
                                  cfg[k] * 4, kernel_size=3, padding=1)]
         conf_layers += [nn.Conv2d(vgg[v].out_channels,
                         cfg[k] * num_classes, kernel_size=3, padding=1)]
+    # 每个extra_layer有两层conv
     for k, v in enumerate(extra_layers[1::2], 2):
         loc_layers += [nn.Conv2d(v.out_channels, cfg[k]
                                  * 4, kernel_size=3, padding=1)]

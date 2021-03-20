@@ -206,7 +206,7 @@ def nms(boxes, scores, overlap=0.5, top_k=200):
         The indices of the kept boxes with respect to num_priors.
     """
 
-    keep = scores.new(scores.size(0)).zero_().long()
+    keep = scores.new(scores.size(0)).zero_().long()  # scores的长度可能小于top_k,因此不用top_k来创建keep
     if boxes.numel() == 0:
         return keep
     x1 = boxes[:, 0]
@@ -235,6 +235,20 @@ def nms(boxes, scores, overlap=0.5, top_k=200):
             break
         idx = idx[:-1]  # remove kept element from view
         # load bboxes of next highest vals
+        # 添加代码，否则报错 RuntimeError: index_select(): functions with out=... arguments don't support automatic 
+        # differentiation, but one of the arguments requires grad.
+        idx= torch.autograd.Variable(idx, requires_grad=False)
+        idx = idx.data
+        x1 = torch.autograd.Variable(x1, requires_grad=False)
+        x1 = x1.data
+        y1 = torch.autograd.Variable(y1, requires_grad=False)
+        y1 = y1.data
+        x2 = torch.autograd.Variable(x2, requires_grad=False)
+        x2 = x2.data
+        y2 = torch.autograd.Variable(y2, requires_grad=False)
+        y2 = y2.data
+
+        # torch.index_select(input, dim, index, *, out=None) 
         torch.index_select(x1, 0, idx, out=xx1)
         torch.index_select(y1, 0, idx, out=yy1)
         torch.index_select(x2, 0, idx, out=xx2)
@@ -253,6 +267,13 @@ def nms(boxes, scores, overlap=0.5, top_k=200):
         h = torch.clamp(h, min=0.0)
         inter = w*h
         # IoU = i / (area(a) + area(b) - i)
+        # 添加代码，否则报错 RuntimeError: index_select(): functions with out=... arguments don't support automatic 
+        # differentiation, but one of the arguments requires grad.
+        area = torch.autograd.Variable(area, requires_grad=False)
+        area = area.data
+        idx= torch.autograd.Variable(idx, requires_grad=False)
+        idx = idx.data
+
         rem_areas = torch.index_select(area, 0, idx)  # load remaining areas)
         union = (rem_areas - inter) + area[i]
         IoU = inter/union  # store result in iou

@@ -150,6 +150,7 @@ def write_voc_results_file(all_boxes, dataset):
     for cls_ind, cls in enumerate(labelmap):
         print('Writing {:s} VOC results file'.format(cls))
         filename = get_voc_results_file_template(set_type, cls)
+        # VOCdevkit/VOC2007/results/det_test_(class_name).txt
         with open(filename, 'wt') as f:
             for im_ind, index in enumerate(dataset.ids):
                 dets = all_boxes[cls_ind+1][im_ind]
@@ -169,6 +170,7 @@ def do_python_eval(output_dir='output', use_07=True):
     # The PASCAL VOC metric changed in 2010
     use_07_metric = use_07
     print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
+    # output_dir ./ssd300/test/
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
     for i, cls in enumerate(labelmap):
@@ -296,6 +298,7 @@ cachedir: Directory for caching the annotations
                                  'det': det}
 
     # read dets
+    # /VOCdevkit/VOC2007/results/det_test_(class_name).txt
     detfile = detpath.format(classname)
     with open(detfile, 'r') as f:
         lines = f.readlines()
@@ -409,6 +412,7 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
         print('im_detect: {:d}/{:d} {:.3f}s'.format(i + 1,
                                                     num_images, detect_time))
 
+    # det_file ./ssd600/test/detections.pkl
     with open(det_file, 'wb') as f:
         pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
 

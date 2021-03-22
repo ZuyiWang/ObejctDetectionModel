@@ -106,46 +106,6 @@ class Timer(object):
         else:
             return self.diff
 
-
-def get_output_dir(name, phase):
-    """Return the directory where experimental artifacts are placed.
-    If the directory does not exist, it is created.
-    A canonical path is built using the name from an imdb and a network
-    (if not None).
-    """
-    filedir = os.path.join(name, phase)
-    if not os.path.exists(filedir):
-        os.makedirs(filedir)
-    return filedir
-
-
-def get_voc_results_file_template(image_set, cls):
-    # VOCdevkit/VOC2007/results/det_test_aeroplane.txt
-    filename = 'det_' + image_set + '_%s.txt' % (cls)
-    filedir = os.path.join(devkit_path, 'results')
-    if not os.path.exists(filedir):
-        os.makedirs(filedir)
-    path = os.path.join(filedir, filename)
-    return path
-
-
-def write_voc_results_file(all_boxes, dataset):
-    for cls_ind, cls in enumerate(labelmap):
-        print('Writing {:s} VOC results file'.format(cls))
-        filename = get_voc_results_file_template(set_type, cls)
-        with open(filename, 'wt') as f:
-            for im_ind, index in enumerate(dataset.ids):
-                dets = all_boxes[cls_ind+1][im_ind]
-                if dets == []:
-                    continue
-                # the VOCdevkit expects 1-based indices
-                for k in range(dets.shape[0]):
-                    f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                            format(index[1], dets[k, -1],
-                                   dets[k, 0] + 1, dets[k, 1] + 1,
-                                   dets[k, 2] + 1, dets[k, 3] + 1))
-
-
 def predict_net(net, cuda, image, top_k, height, width, im_size=300, thresh=0.05):
     # all detections are collected into:
     #    all_boxes[cls][image] = N x 5 array of detections in
@@ -202,15 +162,6 @@ def predict_net(net, cuda, image, top_k, height, width, im_size=300, thresh=0.05
         cv2.imshow('result', original_img)
         if cv2.waitKey(0) & 0xFF == ord('q'):
             break          
-
-
-
-
-
-def evaluate_detections(box_list, output_dir, dataset):
-    write_voc_results_file(box_list, dataset)
-    do_python_eval(output_dir)
-
 
 if __name__ == '__main__':
     # load net

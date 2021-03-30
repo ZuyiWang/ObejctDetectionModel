@@ -40,3 +40,19 @@ coco = {
     'clip': True,
     'name': 'COCO',
 }
+
+# SSD_resnet101 configs
+voc_resnet = {
+    'num_classes': 21,
+    'lr_steps': (80000, 100000, 120000),
+    'max_iter': 120000,
+    'feature_maps': [40, 20, 10, 5, 3, 1],   # 被挑选的feature map的size
+    'min_dim': 320,
+    'steps': [8, 16, 32, 64, 106, 320],
+    'min_sizes': [32, 64, 118, 173, 227, 282],
+    'max_sizes': [64, 118, 173, 227, 282, 336],
+    'aspect_ratios': [[2], [2, 3], [2, 3], [2, 3], [2], [2]],
+    'variance': [0.1, 0.2],
+    'clip': True,
+    'name': 'VOC',
+}

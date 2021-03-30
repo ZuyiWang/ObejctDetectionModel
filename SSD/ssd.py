@@ -3,8 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from layers import *
-from data import voc, coco
+from data import voc, coco, voc_resnet
 import os
+from resnet.resnet import Bottleneck, ResNet
 
 
 class SSD(nn.Module):
@@ -25,11 +26,15 @@ class SSD(nn.Module):
         head: "multibox head" consists of loc and conf conv layers
     """
 
-    def __init__(self, phase, size, base, extras, head, num_classes):
+    def __init__(self, phase, basenet, size, base, head, num_classes, extras=None):
         super(SSD, self).__init__()
         self.phase = phase
+        self.basenet = basenet
         self.num_classes = num_classes
-        self.cfg = (coco, voc)[num_classes == 21]
+        if basenet == 'vgg16':
+            self.cfg = (coco, voc)[num_classes == 21]
+        elif basenet == 'resnet101':
+            self.cfg = voc_resnet
         self.priorbox = PriorBox(self.cfg)
         # self.priors = Variable(self.priorbox.forward(), volatile=True)
         self.priors = self.priorbox.forward()
@@ -37,10 +42,13 @@ class SSD(nn.Module):
         self.size = size
 
         # SSD network
-        self.vgg = nn.ModuleList(base)
-        # Layer learns to scale the l2 normalized features from conv4_3
-        self.L2Norm = L2Norm(512, 20)
-        self.extras = nn.ModuleList(extras)
+        if basenet == 'vgg16':
+            self.vgg = nn.ModuleList(base)
+            # Layer learns to scale the l2 normalized features from conv4_3
+            self.L2Norm = L2Norm(512, 20)
+            self.extras = nn.ModuleList(extras)
+        elif basenet == 'resnet101':
+            self.resnet101 = base
 
         self.loc = nn.ModuleList(head[0])
         self.conf = nn.ModuleList(head[1])
@@ -71,24 +79,27 @@ class SSD(nn.Module):
         sources = list()
         loc = list()
         conf = list()
+        if self.basenet == 'vgg16':
+            # apply vgg up to conv4_3 relu
+            for k in range(23):
+                x = self.vgg[k](x)
 
-        # apply vgg up to conv4_3 relu
-        for k in range(23):
-            x = self.vgg[k](x)
+            s = self.L2Norm(x)
+            sources.append(s)
 
-        s = self.L2Norm(x)
-        sources.append(s)
+            # apply vgg up to fc7
+            for k in range(23, len(self.vgg)):
+                x = self.vgg[k](x)
+            sources.append(x)
 
-        # apply vgg up to fc7
-        for k in range(23, len(self.vgg)):
-            x = self.vgg[k](x)
-        sources.append(x)
-
-        # apply extra layers and cache source layer outputs
-        for k, v in enumerate(self.extras):
-            x = F.relu(v(x), inplace=True)
-            if k % 2 == 1:
-                sources.append(x)
+            # apply extra layers and cache source layer outputs
+            for k, v in enumerate(self.extras):
+                x = F.relu(v(x), inplace=True)
+                if k % 2 == 1:
+                    sources.append(x)
+        elif self.basenet == 'resnet101':
+            p3, p5, p6, p7, p8, p9 = self.resnet101(x)
+            sources.extend([p3, p5, p6, p7, p8, p9])
 
         # apply multibox head to source layers
         for (x, l, c) in zip(sources, self.loc, self.conf):
@@ -199,8 +210,26 @@ def multibox(vgg, extra_layers, cfg, num_classes):
                                   * num_classes, kernel_size=3, padding=1)]
     return vgg, extra_layers, (loc_layers, conf_layers)
 
+def multihead_resnet(resnet, cfg, num_classes):
+    loc_layers = []
+    conf_layers = []
+    out_channels = (512, 1024, 1024, 1024, 1024, 1024)
+    # resnet使用conv3和conv5的最后一层的feature map用来做预测
+    for k in range(2):
+        loc_layers += [nn.Conv2d(out_channels[k],
+                                cfg[k] * 4, kernel_size=3, padding=1)]
+        conf_layers += [nn.Conv2d(out_channels[k],
+                                cfg[k] * num_classes, kernel_size=3, padding=1)]
+    # resnet包含的4个extra_layer
+    for k in range(2, 6):
+        loc_layers += [nn.Conv2d(out_channels[k], cfg[k]
+                                * 4, kernel_size=3, padding=1)]
+        conf_layers += [nn.Conv2d(out_channels[k], cfg[k]
+                                * num_classes, kernel_size=3, padding=1)]
+    return (loc_layers, conf_layers)
 
-base = {
+
+vgg_base = {
     '300': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'C', 512, 512, 512, 'M',
             512, 512, 512],
     '512': [],
@@ -212,18 +241,32 @@ extras = {
 mbox = {
     '300': [4, 6, 6, 6, 4, 4],  # number of boxes per feature map location
     '512': [],
+    'resnet101': [4, 6, 6, 6, 4, 4],
+}
+resnet_base = {
+    'resnet101': [3, 4, 23, 3],
 }
 
 
-def build_ssd(phase, size=300, num_classes=21):
+def build_ssd(phase, backbone, size=300, num_classes=21):
     if phase != "test" and phase != "train":
         print("ERROR: Phase: " + phase + " not recognized")
         return
-    if size != 300:
+    if size != 300 and size != 320:
         print("ERROR: You specified size " + repr(size) + ". However, " +
-              "currently only SSD300 (size=300) is supported!")
+              "currently only SSD300 (size=300) or SSD with resnet101 (size=320) is supported!")
         return
-    base_, extras_, head_ = multibox(vgg(base[str(size)], 3),
-                                     add_extras(extras[str(size)], 1024),
-                                     mbox[str(size)], num_classes)
-    return SSD(phase, size, base_, extras_, head_, num_classes)
+    if backbone == 'vgg16':
+        base_, extras_, head_ = multibox(vgg(vgg_base[str(size)], 3),
+                                        add_extras(extras[str(size)], 1024),
+                                        mbox[str(size)], num_classes)
+        return SSD(phase, backbone, size, base_, head_, num_classes, extras_)
+    elif backbone == 'resnet101':
+        # TODO
+        base_ = ResNet(Bottleneck, resnet_base[backbone])
+        head_ = multihead_resnet(base_, mbox[backbone], num_classes)
+
+        return SSD(phase, backbone, size, base_, head_, num_classes)
+        
+
+    

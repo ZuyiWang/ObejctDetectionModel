@@ -28,8 +28,10 @@ parser.add_argument('--dataset', default='VOC', choices=['VOC', 'COCO'],
                     type=str, help='VOC or COCO')
 parser.add_argument('--dataset_root', default=VOC_ROOT,
                     help='Dataset root directory path')
-parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
+parser.add_argument('--basenet', default='resnet101',
                     help='Pretrained base model')
+parser.add_argument('--pretrained_weights', default='resnet101-5d3b4d8f.pth',
+                    help='Pretrained weights')
 parser.add_argument('--batch_size', default=32, type=int,
                     help='Batch size for training')
 parser.add_argument('--resume', default=None, type=str,
@@ -79,14 +81,21 @@ def train():
             print("WARNING: Using default COCO dataset_root because " +
                   "--dataset_root was not specified.")
             args.dataset_root = COCO_ROOT
-        cfg = coco
+        if args.basenet == 'vgg16':
+            cfg = coco
+        elif args.basenet == 'resnet101':
+            # TODO 修改COCO数据集的configs
+            cfg = coco
         dataset = COCODetection(root=args.dataset_root,
                                 transform=SSDAugmentation(cfg['min_dim'],
                                                           MEANS))
     elif args.dataset == 'VOC':
         if args.dataset_root == COCO_ROOT:
             parser.error('Must specify dataset if specifying dataset_root')
-        cfg = voc
+        if args.basenet == 'vgg16':
+            cfg = voc
+        elif args.basenet == 'resnet101':
+            cfg = voc_resnet
         dataset = VOCDetection(root=args.dataset_root,
                                transform=SSDAugmentation(cfg['min_dim'],
                                                          MEANS))
@@ -100,7 +109,7 @@ def train():
         writer = SummaryWriter(log_dir)
 
 
-    ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
+    ssd_net = build_ssd('train', args.basenet, cfg['min_dim'], cfg['num_classes'])
     net = ssd_net
     device_ids = [0]
 
@@ -113,17 +122,23 @@ def train():
         print('Resuming training, loading {}...'.format(args.resume))
         ssd_net.load_weights(args.resume)
     else:
-        vgg_weights = torch.load(args.save_folder + args.basenet)
-        print('Loading base network...')
-        ssd_net.vgg.load_state_dict(vgg_weights)
+        if args.basenet == "vgg16":
+            vgg_weights = torch.load(args.save_folder + args.pretrained_weights)
+            print('Loading vgg base network...')
+            ssd_net.vgg.load_state_dict(vgg_weights)
+        elif args.basenet == 'resnet101':
+            resnet_weights = torch.load(args.save_folder + args.pretrained_weights)
+            print('Loading resnet base network...')
+            ssd_net.resnet101.load_state_dict(resnet_weights, strict=False)
 
     if args.cuda:
         net = net.cuda()
 
     if not args.resume:
         print('Initializing weights...')
-        # initialize newly added layers' weights with xavier method
-        ssd_net.extras.apply(weights_init)
+        if args.basenet == 'vgg16':   # resnet在声明对象时已经初始化参数       
+            # initialize newly added layers' weights with xavier method
+            ssd_net.extras.apply(weights_init)
         ssd_net.loc.apply(weights_init)
         ssd_net.conf.apply(weights_init)
 
@@ -227,10 +242,10 @@ def train():
 
         if iteration != 0 and iteration % 5000 == 0:
             print('Saving state, iter:', iteration)
-            torch.save(ssd_net.state_dict(), 'weights/ssd300_COCO_' +
+            torch.save(ssd_net.state_dict(), 'weights/ssd300_' + args.dataset + '_' + args.basenet + '_' +
                        repr(iteration) + '.pth')
     torch.save(ssd_net.state_dict(),
-               args.save_folder + '' + args.dataset + '.pth')
+               args.save_folder + '' + args.dataset + '_' + args.basenet + '.pth')
 
 
 def adjust_learning_rate(optimizer, gamma, step):

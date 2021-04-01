@@ -1,0 +1,50 @@
+AP for aeroplane = 0.8255
+AP for bicycle = 0.8536
+AP for bird = 0.7493
+AP for boat = 0.7118
+AP for bottle = 0.5121
+AP for bus = 0.8420
+AP for car = 0.8586
+AP for cat = 0.8767
+AP for chair = 0.6258
+AP for cow = 0.8230
+AP for diningtable = 0.7720
+AP for dog = 0.8557
+AP for horse = 0.8710
+AP for motorbike = 0.8321
+AP for person = 0.7874
+AP for pottedplant = 0.5127
+AP for sheep = 0.7675
+AP for sofa = 0.7986
+AP for train = 0.8480
+AP for tvmonitor = 0.7780
+Mean AP = 0.7751
+~~~~~~~~
+Results:
+0.825
+0.854
+0.749
+0.712
+0.512
+0.842
+0.859
+0.877
+0.626
+0.823
+0.772
+0.856
+0.871
+0.832
+0.787
+0.513
+0.768
+0.799
+0.848
+0.778
+0.775
+~~~~~~~~
+
+--------------------------------------------------------------
+Results computed with the **unofficial** Python eval code.
+Results should be very close to the official MATLAB eval code.
+--------------------------------------------------------------

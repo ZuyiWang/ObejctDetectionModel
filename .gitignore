@@ -12,6 +12,8 @@
 /SSD/.vscode
 /SSD/weights
 /SSD/runs
+/SSD/vgg_runs
+/SSD/vgg16_runs
 /SSD/data/__pycache__/
 /SSD/layers/__pycache__/
 /SSD/layers/functions/__pycache__/

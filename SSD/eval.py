@@ -39,7 +39,7 @@ parser = argparse.ArgumentParser(
 #                     default='weights/ssd300_mAP_77.43_v2.pth', type=str,
 #                     help='Trained state_dict file path to open')
 parser.add_argument('--trained_model',
-                    default='weights/ssd300_VOC_vgg16_95000.pth', type=str,
+                    default='weights/ssd300_VOC_vgg16_85000.pth', type=str,
                     help='Trained state_dict file path to open')
 parser.add_argument('--save_folder', default='eval/', type=str,
                     help='File path to save results')

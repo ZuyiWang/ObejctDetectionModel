@@ -120,7 +120,8 @@ def train():
 
     if args.resume:
         print('Resuming training, loading {}...'.format(args.resume))
-        ssd_net.load_weights(args.resume)
+        # ssd_net.load_weights(args.resume)
+        ssd_net.load_state_dict(torch.load(args.resume), strict=True)
     else:
         if args.basenet == "vgg16":
             vgg_weights = torch.load(args.save_folder + args.pretrained_weights)
@@ -139,8 +140,10 @@ def train():
         if args.basenet == 'vgg16':   # resnet在声明对象时已经初始化参数       
             # initialize newly added layers' weights with xavier method
             ssd_net.extras.apply(weights_init)
-        ssd_net.loc.apply(weights_init)
-        ssd_net.conf.apply(weights_init)
+        if not ssd_net.predict_modules:
+            ssd_net.loc.apply(weights_init)
+            ssd_net.conf.apply(weights_init)
+        
 
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum,
                           weight_decay=args.weight_decay)

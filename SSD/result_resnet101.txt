@@ -48,3 +48,110 @@ Results:
 Results computed with the **unofficial** Python eval code.
 Results should be very close to the official MATLAB eval code.
 --------------------------------------------------------------
+
+
+
+AP for aeroplane = 0.7687
+AP for bicycle = 0.8420
+AP for bird = 0.7349
+AP for boat = 0.6135
+AP for bottle = 0.4761
+AP for bus = 0.8415
+AP for car = 0.8169
+AP for cat = 0.8760
+AP for chair = 0.6175
+AP for cow = 0.7923
+AP for diningtable = 0.7599
+AP for dog = 0.8675
+AP for horse = 0.8751
+AP for motorbike = 0.8158
+AP for person = 0.7719
+AP for pottedplant = 0.5188
+AP for sheep = 0.7606
+AP for sofa = 0.8184
+AP for train = 0.8619
+AP for tvmonitor = 0.7151
+Mean AP = 0.7572
+~~~~~~~~
+Results:
+0.769
+0.842
+0.735
+0.614
+0.476
+0.841
+0.817
+0.876
+0.617
+0.792
+0.760
+0.868
+0.875
+0.816
+0.772
+0.519
+0.761
+0.818
+0.862
+0.715
+0.757
+~~~~~~~~
+
+--------------------------------------------------------------
+Results computed with the **unofficial** Python eval code.
+Results should be very close to the official MATLAB eval code.
+--------------------------------------------------------------
+
+
+
+####  New Model
+AP for aeroplane = 0.7622
+AP for bicycle = 0.8606
+AP for bird = 0.7389
+AP for boat = 0.6285
+AP for bottle = 0.4764
+AP for bus = 0.8416
+AP for car = 0.8195
+AP for cat = 0.8802
+AP for chair = 0.6218
+AP for cow = 0.8039
+AP for diningtable = 0.7543
+AP for dog = 0.8733
+AP for horse = 0.8715
+AP for motorbike = 0.8166
+AP for person = 0.7743
+AP for pottedplant = 0.5276
+AP for sheep = 0.7767
+AP for sofa = 0.8116
+AP for train = 0.8687
+AP for tvmonitor = 0.7205
+Mean AP = 0.7614
+~~~~~~~~
+Results:
+0.762
+0.861
+0.739
+0.629
+0.476
+0.842
+0.819
+0.880
+0.622
+0.804
+0.754
+0.873
+0.872
+0.817
+0.774
+0.528
+0.777
+0.812
+0.869
+0.720
+0.761
+~~~~~~~~
+
+--------------------------------------------------------------
+Results computed with the **unofficial** Python eval code.
+Results should be very close to the official MATLAB eval code.
+--------------------------------------------------------------

@@ -233,6 +233,7 @@ class ResNet(nn.Module):
         x = self.maxpool(x)
 
         x = self.layer1(x)
+        x2 = x
         x = self.layer2(x)
         x5 = self.dilate_layer4(self.layer3(x))
 
@@ -241,7 +242,7 @@ class ResNet(nn.Module):
         x8 = self.extra_layer7(x7)
         x9 = self.extra_layer8(x8)
 
-        return x, x5, x6, x7, x8, x9
+        return x2, x, x5, x6, x7, x8, x9
 
 
 def load_pretrained(model, state_dict):

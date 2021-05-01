@@ -1,6 +1,11 @@
 import os
 import torch
-from torch.utils.ffi import create_extension
+# from torch.utils.ffi import create_extension
+from pkg_resources import parse_version
+if parse_version(torch.__version__) >= parse_version("1.0.0"):
+    from torch.utils.cpp_extension import BuildExtension as create_extension
+else:
+    from torch.utils.ffi import create_extension
 
 
 sources = ['src/dcn_v2_double.c']

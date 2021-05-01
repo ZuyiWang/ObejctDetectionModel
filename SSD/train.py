@@ -14,7 +14,9 @@ import torch.nn.init as init
 import torch.utils.data as data
 import numpy as np
 import argparse
+import random
 
+# torch.cuda.set_device(1)
 
 
 def str2bool(v):
@@ -24,17 +26,17 @@ def str2bool(v):
 parser = argparse.ArgumentParser(
     description='Single Shot MultiBox Detector Training With Pytorch')
 train_set = parser.add_mutually_exclusive_group()
-parser.add_argument('--dataset', default='VOC', choices=['VOC', 'COCO'],
+parser.add_argument('--dataset', default='COCO', choices=['VOC', 'COCO'],
                     type=str, help='VOC or COCO')
-parser.add_argument('--dataset_root', default=VOC_ROOT,
+parser.add_argument('--dataset_root', default=COCO_ROOT,     
                     help='Dataset root directory path')
-parser.add_argument('--basenet', default='resnet101',
+parser.add_argument('--basenet', default='vgg16',
                     help='Pretrained base model')
-parser.add_argument('--pretrained_weights', default='resnet101-5d3b4d8f.pth',
+parser.add_argument('--pretrained_weights', default='vgg16_reducedfc.pth',
                     help='Pretrained weights')
-parser.add_argument('--batch_size', default=16, type=int,
+parser.add_argument('--batch_size', default=1, type=int,
                     help='Batch size for training')
-parser.add_argument('--resume', default=None, type=str,  # 'weights/VOC_resnet101.pth' weights/VOC_vgg16.pth
+parser.add_argument('--resume', default='weights/ssd300_COCO_vgg16_120000.pth', type=str,  # 
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--start_iter', default=0, type=int,
                     help='Resume training at this iter')
@@ -105,7 +107,9 @@ def train():
     #     viz = visdom.Visdom()
     if args.tensorboard:
         from torch.utils.tensorboard import SummaryWriter
-        log_dir = './'+ args.basenet +'_runs'
+        log_dir = './'+ args.basenet + '_' + args.dataset + '_' + str(random.randint(0, 100)) +'_runs'
+        while os.path.exists(log_dir):
+            log_dir = './'+ args.basenet + '_' + args.dataset + '_' + str(random.randint(0, 100)) +'_runs'
         writer = SummaryWriter(log_dir)
 
 
@@ -140,7 +144,8 @@ def train():
         if args.basenet == 'vgg16':   # resnet在声明对象时已经初始化参数       
             # initialize newly added layers' weights with xavier method
             ssd_net.extras.apply(weights_init)
-        if not ssd_net.predict_modules:
+        # if not ssd_net.predict_modules:
+        if ssd_net.loc and ssd_net.conf:
             ssd_net.loc.apply(weights_init)
             ssd_net.conf.apply(weights_init)
         

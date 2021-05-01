@@ -7,8 +7,10 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
-from data import VOC_ROOT, VOCAnnotationTransform, VOCDetection, BaseTransform, base_transform
+# from data import VOC_ROOT, VOCAnnotationTransform, VOCDetection, BaseTransform, base_transform
 from data import VOC_CLASSES as labelmap
+from data import COCO_ROOT, COCOAnnotationTransform, COCODetection, BaseTransform, base_transform
+# from data import COCO_CLASSES as labelmap
 import torch.utils.data as data
 
 from ssd import build_ssd
@@ -32,15 +34,15 @@ parser = argparse.ArgumentParser(
 #                     default='weights/ssd300_mAP_77.43_v2.pth', type=str,
 #                     help='Trained state_dict file path to open')
 parser.add_argument('--trained_model',
-                    default='weights/ssd300_VOC_resnet101_95000.pth', type=str,
+                    default='weights/VOC_vgg16.pth', type=str,
                     help='Trained state_dict file path to open')
-parser.add_argument('--confidence_threshold', default=0.9, type=float,
+parser.add_argument('--confidence_threshold', default=0.5, type=float,
                     help='Detection confidence threshold')
 parser.add_argument('--top_k', default=5, type=int,
                     help='Further restrict the number of predictions to parse')
 parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use cuda to train model')
-parser.add_argument('--image_file', default="/home/iaes/ObjectDetectionModel/SSD/000019.jpg",
+parser.add_argument('--image_file', default="/home/iaes/ObjectDetectionModel/SSD/dog.jpg",
                     help='Location of image')
 
 args = parser.parse_args()
@@ -148,7 +150,7 @@ def predict_net(net, cuda, image, top_k, height, width, im_size=300, thresh=0.05
             continue
         for i in range(all_boxes[index+1].shape[0]):
             if all_boxes[index+1][i][-1] >= thresh:
-                color = Color[index]
+                color = Color[(index+1)%21]
                 left_up = (round(all_boxes[index+1][i][0]), round(all_boxes[index+1][i][1]))
                 right_bottom = (round(all_boxes[index+1][i][2]), round(all_boxes[index+1][i][3]))
                 cv2.rectangle(original_img, left_up, right_bottom, color, 2)
@@ -166,18 +168,18 @@ def predict_net(net, cuda, image, top_k, height, width, im_size=300, thresh=0.05
 if __name__ == '__main__':
     # load net
     num_classes = len(labelmap) + 1                      # +1 for background
-    net = build_ssd('test', 'resnet101', 320, num_classes)            # initialize SSD
-    net.load_state_dict(torch.load(args.trained_model))
+    net = build_ssd('test', 'vgg16', 300, num_classes)            # initialize SSD
+    net.load_state_dict(torch.load(args.trained_model, map_location='cuda:0'), strict=False)
     net.eval()
     print('Finished loading model!')
     # load data
     img = cv2.imread(args.image_file)
     height, width, channels = img.shape
-    img = base_transform(img, 320, dataset_mean)
+    img = base_transform(img, 300, dataset_mean)
 
     if args.cuda:
         net = net.cuda()
         cudnn.benchmark = True
     # evaluation
-    predict_net(net, args.cuda, img, args.top_k, height, width, 320,
+    predict_net(net, args.cuda, img, args.top_k, height, width, 300,
              thresh=args.confidence_threshold)

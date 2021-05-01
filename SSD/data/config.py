@@ -27,7 +27,7 @@ voc = {
 }
 
 coco = {
-    'num_classes': 201,
+    'num_classes': 81,         # 201     为什么是201，不应该是81么 
     'lr_steps': (280000, 360000, 400000),
     'max_iter': 400000,
     'feature_maps': [38, 19, 10, 5, 3, 1],
@@ -46,12 +46,12 @@ voc_resnet = {
     'num_classes': 21,
     'lr_steps': (80000, 100000, 120000),
     'max_iter': 120000,
-    'feature_maps': [40, 20, 10, 5, 3, 1],   # 被挑选的feature map的size
+    'feature_maps': [80, 40, 20, 10, 5, 3, 1],   # 被挑选的feature map的size 
     'min_dim': 320,
-    'steps': [8, 16, 32, 64, 106, 320],
-    'min_sizes': [32, 64, 118, 173, 227, 282],
-    'max_sizes': [64, 118, 173, 227, 282, 336],
-    'aspect_ratios': [[2], [2, 3], [2, 3], [2, 3], [2], [2]],
+    'steps': [4, 8, 16, 32, 64, 106, 320],   # 4
+    'min_sizes': [32, 48,  64, 118, 173, 227, 282],  # 48
+    'max_sizes': [48, 64, 118, 173, 227, 282, 336],  # 48
+    'aspect_ratios': [[2], [2], [2, 3], [2, 3], [2, 3], [2], [2]], # [2]
     'variance': [0.1, 0.2],
     'clip': True,
     'name': 'VOC',

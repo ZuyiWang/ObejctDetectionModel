@@ -39,7 +39,7 @@ parser = argparse.ArgumentParser(
 #                     default='weights/ssd300_mAP_77.43_v2.pth', type=str,
 #                     help='Trained state_dict file path to open')
 parser.add_argument('--trained_model',
-                    default='weights/ssd300_VOC_vgg16_85000.pth', type=str,
+                    default='weights/COCO_vgg16.pth', type=str,                # VOC_resnet101_CNN+pre_95000
                     help='Trained state_dict file path to open')
 parser.add_argument('--save_folder', default='eval/', type=str,
                     help='File path to save results')
@@ -426,20 +426,21 @@ def evaluate_detections(box_list, output_dir, dataset):
 
 
 if __name__ == '__main__':
+    torch.cuda.set_device(0)
     # load net
     num_classes = len(labelmap) + 1                      # +1 for background
-    net = build_ssd('test', 'vgg16', 300, num_classes)            # initialize SSD
-    net.load_state_dict(torch.load(args.trained_model))
+    net = build_ssd('test', 'resnet101', 320, num_classes)            # initialize SSD  resnet101
+    net.load_state_dict(torch.load(args.trained_model, map_location='cuda:0'))   # 多GPU训练的结果，测试时需要map_location指定GPU
     net.eval()
     print('Finished loading model!')
     # load data
     dataset = VOCDetection(args.voc_root, [('2007', set_type)],
-                           BaseTransform(300, dataset_mean),
+                           BaseTransform(320, dataset_mean),
                            VOCAnnotationTransform())
     if args.cuda:
         net = net.cuda()
         cudnn.benchmark = True
     # evaluation
     test_net(args.save_folder, net, args.cuda, dataset,
-             BaseTransform(net.size, dataset_mean), args.top_k, 300,
+             BaseTransform(net.size, dataset_mean), args.top_k, 320,
              thresh=args.confidence_threshold)

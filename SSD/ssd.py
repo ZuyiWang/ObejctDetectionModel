@@ -362,11 +362,14 @@ class SSD(nn.Module):
         if head:
             self.loc = nn.ModuleList(head[0])
             self.conf = nn.ModuleList(head[1])
-            self.predict_modules = None
-        elif predict:
+            # self.predict_modules = None
+        else:
+            self.loc = None
+            self.conf = None
+        if predict:
             self.predict_modules = nn.ModuleList(predict)
         else:
-            raise Exception('No head layers and prediction modules at the same time!')
+            self.predict_modules = None
 
         if phase == 'test':
             self.softmax = nn.Softmax(dim=-1)
@@ -413,8 +416,8 @@ class SSD(nn.Module):
                 if k % 2 == 1:
                     sources.append(x)
         elif self.basenet == 'resnet101':
-            p3, p5, p6, p7, p8, p9 = self.resnet101(x)
-            sources.extend([p3, p5, p6, p7, p8, p9])
+            p2, p3, p5, p6, p7, p8, p9 = self.resnet101(x)
+            sources.extend([p2, p3, p5, p6, p7, p8, p9])
 
         # apply multibox head to source layers
         if not self.predict_modules:
@@ -425,7 +428,16 @@ class SSD(nn.Module):
             for (x, pre_) in zip(sources, self.predict_modules):
                 c, l = pre_(x)
                 loc.append(l.permute(0, 2, 3, 1).contiguous())
-                conf.append(c.permute(0, 2, 3, 1).contiguous())                
+                conf.append(c.permute(0, 2, 3, 1).contiguous())     
+        # if self.loc and self.conf:
+        #     for (x, l, c) in zip(sources[:2], self.loc, self.conf):
+        #         loc.append(l(x).permute(0, 2, 3, 1).contiguous())
+        #         conf.append(c(x).permute(0, 2, 3, 1).contiguous())
+        # if self.predict_modules:
+        #     for (x, pre_) in zip(sources[2:], self.predict_modules):
+        #         c, l = pre_(x)
+        #         loc.append(l.permute(0, 2, 3, 1).contiguous())
+        #         conf.append(c.permute(0, 2, 3, 1).contiguous())             
 
 
         loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
@@ -552,17 +564,28 @@ def multihead_resnet(resnet, cfg, num_classes):
 
 def multipredict_resnet(resnet, cfg, num_classes):
     pre_modules = []
+    loc_layers = []
+    conf_layers = []
     # resnet101中选择的各feature map层的channel数
-    out_channels = (512, 1024, 1024, 1024, 1024, 1024)
+    out_channels = (256, 512, 1024, 1024, 1024, 1024, 1024)  # conv2---256
 
     # resnet使用conv3和conv5的最后一层的feature map用来做预测
+    # 多加了一层 conv2
+    # for k in range(2):
+    #     pre_modules += [PredictionModule_C(out_channels[k], cfg[k], num_classes)]
     for k in range(2):
-        pre_modules += [PredictionModule_C(out_channels[k], cfg[k], num_classes)]
+        loc_layers += [nn.Conv2d(out_channels[k],
+                                cfg[k] * 4, kernel_size=3, padding=1)]
+        conf_layers += [nn.Conv2d(out_channels[k],
+                                cfg[k] * num_classes, kernel_size=3, padding=1)]
 
-    # resnet包含的4个extra_layer
-    for k in range(2, 6):
+    pre_modules += [PredictionModule_C(out_channels[2], cfg[2], num_classes)]
+
+    # conv6, 7, 8, 9
+    for k in range(3, 7):
         pre_modules += [PredictionModule_C(out_channels[k], cfg[k], num_classes)]
-    return pre_modules
+    # return pre_modules
+    return pre_modules, (loc_layers, conf_layers)
 
 vgg_base = {
     '300': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'C', 512, 512, 512, 'M',
@@ -576,7 +599,7 @@ extras = {
 mbox = {
     '300': [4, 6, 6, 6, 4, 4],  # number of boxes per feature map location
     '512': [],
-    'resnet101': [4, 6, 6, 6, 4, 4],
+    'resnet101': [4, 4, 6, 6, 6, 4, 4],
 }
 resnet_base = {
     'resnet101': [3, 4, 23, 3],
@@ -595,14 +618,16 @@ def build_ssd(phase, backbone, size=300, num_classes=21):
         base_, extras_, head_ = multibox(vgg(vgg_base[str(size)], 3),
                                         add_extras(extras[str(size)], 1024),
                                         mbox[str(size)], num_classes)
-        return SSD(phase, backbone, size, base_, head_, num_classes, extras_)
+        return SSD(phase, backbone, size, base_, head_, num_classes, extras=extras_)
     elif backbone == 'resnet101':
         base_ = ResNet(Bottleneck, resnet_base[backbone])
         # SSD中的预测卷积层
         # head_ = multihead_resnet(base_, mbox[backbone], num_classes)
         # 修改后的预测模块
-        prediction_ = multipredict_resnet(base_, mbox[backbone], num_classes)
-        return SSD(phase, backbone, size, base_, None, num_classes, predict=prediction_)
+        # prediction_ = multipredict_resnet(base_, mbox[backbone], num_classes)
+        # 卷积层+预测模块
+        prediction_, head_ = multipredict_resnet(base_, mbox[backbone], num_classes)
+        return SSD(phase, backbone, size, base_, head_, num_classes, predict=prediction_)
         # return SSD(phase, backbone, size, base_, head_, num_classes)
         
 

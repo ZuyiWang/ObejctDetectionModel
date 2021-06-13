@@ -148,7 +148,6 @@ class PoseResNet(nn.Module):
               padding=0
           )
           self.__setattr__(head, fc)
-
         # self.final_layer = nn.ModuleList(self.final_layer)
 
     def _make_layer(self, block, planes, blocks, stride=1):
@@ -254,10 +253,13 @@ class PoseResNet(nn.Module):
                           else:
                               nn.init.normal_(m.weight, std=0.001)
                               nn.init.constant_(m.bias, 0)
-            #pretrained_state_dict = torch.load(pretrained)
-            url = model_urls['resnet{}'.format(num_layers)]
-            pretrained_state_dict = model_zoo.load_url(url)
-            print('=> loading pretrained model {}'.format(url))
+            if os.path.exists(pretrained):
+                pretrained_state_dict = torch.load(pretrained)
+                print('=> loading pretrained model from {}'.format(pretrained))
+            else:
+                url = model_urls['resnet{}'.format(num_layers)]
+                pretrained_state_dict = model_zoo.load_url(url)
+                print('=> loading pretrained model {}'.format(url))
             self.load_state_dict(pretrained_state_dict, strict=False)
         else:
             print('=> imagenet pretrained model dose not exist')
@@ -276,5 +278,5 @@ def get_pose_net(num_layers, heads, head_conv):
   block_class, layers = resnet_spec[num_layers]
 
   model = PoseResNet(block_class, layers, heads, head_conv=head_conv)
-  model.init_weights(num_layers, pretrained=True)
+  model.init_weights(num_layers, pretrained='/home/iaes/ObjectDetectionModel/pretrained/resnet101-5d3b4d8f.pth')
   return model

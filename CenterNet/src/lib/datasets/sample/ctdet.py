@@ -10,7 +10,7 @@ import cv2
 import os
 from utils.image import flip, color_aug
 from utils.image import get_affine_transform, affine_transform
-from utils.image import gaussian_radius, draw_umich_gaussian, draw_msra_gaussian
+from utils.image import gaussian_radius, draw_umich_gaussian, draw_msra_gaussian, draw_heatmap
 from utils.image import draw_dense_reg
 import math
 
@@ -92,8 +92,9 @@ class CTDetDataset(data.Dataset):
     cat_spec_wh = np.zeros((self.max_objs, num_classes * 2), dtype=np.float32)
     cat_spec_mask = np.zeros((self.max_objs, num_classes * 2), dtype=np.uint8)
     
-    draw_gaussian = draw_msra_gaussian if self.opt.mse_loss else \
-                    draw_umich_gaussian
+    # draw_gaussian = draw_msra_gaussian if self.opt.mse_loss else \
+    #                 draw_umich_gaussian
+    draw_gaussian = draw_heatmap
 
     gt_det = []
     for k in range(num_objs):
@@ -108,21 +109,22 @@ class CTDetDataset(data.Dataset):
       bbox[[1, 3]] = np.clip(bbox[[1, 3]], 0, output_h - 1)
       h, w = bbox[3] - bbox[1], bbox[2] - bbox[0]
       if h > 0 and w > 0:
-        radius = gaussian_radius((math.ceil(h), math.ceil(w)))
-        radius = max(0, int(radius))
-        radius = self.opt.hm_gauss if self.opt.mse_loss else radius
+        # radius = gaussian_radius((math.ceil(h), math.ceil(w)))
+        # radius = max(0, int(radius))
+        # radius = self.opt.hm_gauss if self.opt.mse_loss else radius
         ct = np.array(
           [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2], dtype=np.float32)
         ct_int = ct.astype(np.int32)
-        draw_gaussian(hm[cls_id], ct_int, radius)
+        # draw_gaussian(hm[cls_id], ct_int, radius)
+        draw_gaussian(hm[cls_id], [bbox[0].astype(np.int32), bbox[1].astype(np.int32)], [bbox[2].astype(np.int32), bbox[3].astype(np.int32)], h, w)
         wh[k] = 1. * w, 1. * h
         ind[k] = ct_int[1] * output_w + ct_int[0]
         reg[k] = ct - ct_int
         reg_mask[k] = 1
         cat_spec_wh[k, cls_id * 2: cls_id * 2 + 2] = wh[k]
         cat_spec_mask[k, cls_id * 2: cls_id * 2 + 2] = 1
-        if self.opt.dense_wh:
-          draw_dense_reg(dense_wh, hm.max(axis=0), ct_int, wh[k], radius)
+        # if self.opt.dense_wh:
+        #   draw_dense_reg(dense_wh, hm.max(axis=0), ct_int, wh[k], radius)
         gt_det.append([ct[0] - w / 2, ct[1] - h / 2, 
                        ct[0] + w / 2, ct[1] + h / 2, 1, cls_id])
     

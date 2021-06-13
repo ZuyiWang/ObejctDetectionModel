@@ -12,6 +12,7 @@ from __future__ import print_function
 import numpy as np
 import cv2
 import random
+from itertools import product
 
 def flip(img):
   return img[:, :, ::-1].copy()  
@@ -122,6 +123,18 @@ def gaussian2D(shape, sigma=1):
     h = np.exp(-(x * x + y * y) / (2 * sigma * sigma))
     h[h < np.finfo(h.dtype).eps * h.max()] = 0
     return h
+
+# centerness draw hp
+def draw_heatmap(heatmap, top_left, bottom_right, h, w, beta=0.5):
+  xtl, ytl = top_left
+  xbr, ybr = max(bottom_right[0], xtl+1), max(bottom_right[1], ytl+1)
+  masked_heatmap  = heatmap[ytl:ybr, xtl:xbr]
+  for i, j in product(range(int(w)), range(int(h))):
+    weight = np.power(((min(i, w-i)/max(i, w-i)) * (min(j, h-j)/max(j, h-j))), beta)
+    # np.minimum(masked_heatmap[j, i], weight, out=masked_heatmap[j, i])
+    masked_heatmap[j, i] = min(masked_heatmap[j, i], weight)
+  masked_heatmap[int(h/2), int(w/2)] = 1
+  return heatmap
 
 def draw_umich_gaussian(heatmap, center, radius, k=1):
   diameter = 2 * radius + 1
